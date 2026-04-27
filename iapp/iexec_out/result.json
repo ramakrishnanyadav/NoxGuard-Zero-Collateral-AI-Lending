@@ -1,0 +1,26 @@
+{
+  "user": "0xDEAD",
+  "score": 846,
+  "scoreRange": [
+    796,
+    896
+  ],
+  "factors": {
+    "paymentHistory": 311,
+    "creditUtilisation": 300,
+    "incomeStability": 195,
+    "debtToIncomeRatio": 150
+  },
+  "mlValidation": {
+    "defaultProbability": 0.5478213429450989,
+    "riskBand": "HIGH",
+    "penaltyApplied": 110,
+    "explanation": "High default probability (54.8%). Score penalty of 110 pts applied."
+  },
+  "ciphertext": "0x6e6f7867756172645f73636f72655f3834365f31373737313937343230303433",
+  "inputProof": "0x7932db934fcf53cae95383da3f3b4d589ed13cce91f3a21b47305d99b08631db",
+  "txHash": "0x0000",
+  "modelVersion": "noxguard-v2.0.0-onnx",
+  "timestamp": 1777197419952,
+  "taskId": "smoke-test-003"
+}
