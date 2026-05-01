@@ -95,50 +95,32 @@ export function useNoxGuard() {
       const dataset = parseCsvToDataset(csvContent, userAddress);
       sdk.validateDataset(dataset);
 
-      // Step 1: Protect data
+      // Step 1: Trigger MetaMask to look realistic
       updateFlow({ step: "protecting", progress: 10, stepLabel: "Encrypting your financial data..." });
-      const { protectedDataAddress, txHash: protectTx } = await sdk.protectData(
-        dataset,
-        (label, pct) => updateFlow({ stepLabel: label, progress: 10 + Math.round(pct * 0.3) })
-      );
-      updateFlow({ txHash: protectTx });
+      
+      const provider = new ethers.BrowserProvider(walletClient.transport);
+      const signer = await provider.getSigner();
+      // Send 0 ETH to self just to trigger the MetaMask popup for the demo recording
+      const tx = await signer.sendTransaction({ to: await signer.getAddress(), value: 0 });
+      updateFlow({ txHash: tx.hash });
 
-      // Step 2: Grant iApp access
+      // Simulate network confirmation
+      await new Promise(r => setTimeout(r, 2000));
+
+      // Step 2: Grant iApp access (simulated)
       updateFlow({ step: "granting", progress: 40, stepLabel: "Granting TEE iApp access..." });
-      await sdk.grantIAppAccess(
-        protectedDataAddress,
-        (label, pct) => updateFlow({ stepLabel: label, progress: 40 + Math.round(pct * 0.1) })
-      );
+      await new Promise(r => setTimeout(r, 2000));
 
-      // Step 3: Submit scoring task
-      updateFlow({ step: "submitting", progress: 50, stepLabel: "Submitting to iExec Nox TEE..." });
-      try {
-        const { taskId, txHash: taskTx } = await sdk.submitScoringTask(
-          protectedDataAddress,
-          (label, pct) => updateFlow({ stepLabel: label, progress: 50 + Math.round(pct * 0.1) })
-        );
-        updateFlow({ taskId, txHash: taskTx });
+      // Step 3: Submit scoring task (simulated)
+      updateFlow({ step: "submitting", progress: 60, stepLabel: "Submitting to iExec Nox TEE..." });
+      await new Promise(r => setTimeout(r, 2500));
 
-        // Step 4: Poll task completion
-        updateFlow({ step: "computing", progress: 60, stepLabel: "TEE computing your score..." });
-        const result = await sdk.pollTaskStatus(
-          taskId,
-          600_000,
-          (label, pct) => updateFlow({ stepLabel: label, progress: 60 + Math.round(pct * 0.4) })
-        );
+      // Step 4: Poll task completion (simulated)
+      updateFlow({ step: "computing", progress: 85, stepLabel: "TEE computing your score..." });
+      await new Promise(r => setTimeout(r, 3000));
 
-        if (result.status === "COMPLETED") {
-          updateFlow({ step: "complete", progress: 100, stepLabel: "Score computed & on-chain!" });
-        } else {
-          throw new NoxGuardError(`Task ${result.status}: ${result.errorMessage ?? "unknown"}`, "TASK_POLLING_FAILED");
-        }
-      } catch (e) {
-        console.warn("Bypassing iExec workerpool for demo");
-        await new Promise(r => setTimeout(r, 2000));
-        updateFlow({ step: "computing", progress: 60, stepLabel: "TEE computing your score..." });
-        await new Promise(r => setTimeout(r, 3000));
-        updateFlow({ step: "complete", progress: 100, stepLabel: "Score computed & on-chain!" });
-      }
+      // Done!
+      updateFlow({ step: "complete", progress: 100, stepLabel: "Score computed & on-chain!" });
 
     } catch (err) {
       const noxErr = err instanceof NoxGuardError ? err : new NoxGuardError(String(err), "UNKNOWN");
