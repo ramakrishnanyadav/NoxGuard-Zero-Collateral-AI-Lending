@@ -100,9 +100,9 @@ export function useNoxGuard() {
       
       const provider = new ethers.BrowserProvider(walletClient!.transport);
       const signer = await provider.getSigner();
-      // Send 0 ETH to self just to trigger the MetaMask popup for the demo recording
-      const tx = await signer.sendTransaction({ to: await signer.getAddress(), value: 0 });
-      updateFlow({ txHash: tx.hash });
+      // Request a free signature to trigger the MetaMask popup for the demo recording without gas errors
+      await signer.signMessage("Authenticate to NoxGuard TEE Enclave");
+      updateFlow({ txHash: "0xsimulated_tx_hash_for_demo" });
 
       // Simulate network confirmation
       await new Promise(r => setTimeout(r, 2000));
