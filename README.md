@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./docs/architecture.jpg" alt="NoxGuard Architecture" width="100%">
+  <img src="./docs/banner.png" alt="NoxGuard — Confidential AI Credit Scoring for Zero-Collateral Lending" width="100%">
 
   <h1>NoxGuard</h1>
   <p><strong>Institutional-Grade Confidential AI Credit Scoring & Zero-Collateral Lending</strong></p>
