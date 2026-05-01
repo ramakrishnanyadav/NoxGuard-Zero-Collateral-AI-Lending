@@ -100,4 +100,11 @@ The NoxGuard infrastructure is strictly compliant with the iExec TEE stack and i
 - **NoxCreditGate:** `0x2C5Ed44ec97a36c77890471E307F7aED74DaAD2A`
 
 ---
+
+## 📚 Technical Documentation
+For deep technical evaluation, security researchers, and judges:
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — Full system architecture, cryptographic flows, SGX trust model, and performance benchmarks
+- **[SECURITY.md](./SECURITY.md)** — Threat model (STRIDE), attack vector analysis, SGX-specific risks, and audit status
+
+---
 *Built for the iExec Vibe Coding Challenge 2026*
