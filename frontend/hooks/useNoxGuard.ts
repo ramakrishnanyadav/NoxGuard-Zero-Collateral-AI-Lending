@@ -98,7 +98,7 @@ export function useNoxGuard() {
       // Step 1: Trigger MetaMask to look realistic
       updateFlow({ step: "protecting", progress: 10, stepLabel: "Encrypting your financial data..." });
       
-      const provider = new ethers.BrowserProvider(walletClient.transport);
+      const provider = new ethers.BrowserProvider(walletClient!.transport);
       const signer = await provider.getSigner();
       // Send 0 ETH to self just to trigger the MetaMask popup for the demo recording
       const tx = await signer.sendTransaction({ to: await signer.getAddress(), value: 0 });
