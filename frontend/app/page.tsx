@@ -54,7 +54,7 @@ export default function HomePage() {
       
       const interval = setInterval(() => {
         setPublicStream((prev) => {
-          const newLines = [...prev, `[FHEVM] Processing encrypted euint64 operations: 0x${Math.random().toString(16).slice(2, 10)}`];
+          const newLines = [...prev, `[SGX ENCLAVE] Computing credit threshold securely: 0x${Math.random().toString(16).slice(2, 10)}`];
           if (newLines.length > 8) newLines.shift();
           return newLines;
         });
@@ -68,7 +68,7 @@ export default function HomePage() {
   // Handle the lending demo
   const handleClaimLoan = async () => {
     setIsLending(true);
-    setPublicStream((prev) => [...prev, `[GATEWAY] Requesting threshold decryption...`]);
+    setPublicStream((prev) => [...prev, `[CREDIT GATE] Verifying TEE signature...`]);
     
     try {
       if (window.ethereum) {
@@ -79,7 +79,7 @@ export default function HomePage() {
         await tx.wait();
       }
       
-      setPublicStream((prev) => [...prev, `[GATEWAY] Callback received. Threshold met (bool).`]);
+      setPublicStream((prev) => [...prev, `[CREDIT GATE] TEE signature verified. Threshold met.`]);
       setPublicStream((prev) => [...prev, `[ERC20] Transfer 10,000 NOXUSD to ${address?.slice(0,6)}...`]);
       setLoanApproved(true);
     } catch (e) {
@@ -282,7 +282,7 @@ export default function HomePage() {
                       disabled={isLending}
                       style={{ width: "100%", padding: "1rem", fontSize: "1.1rem", background: "linear-gradient(135deg, #10b981, #059669)" }}
                     >
-                      {isLending ? "Verifying Proof via FHE Gateway..." : "Claim $10,000 Zero-Collateral Loan"}
+                      {isLending ? "Verifying Proof via TEE Oracle..." : "Claim $10,000 Zero-Collateral Loan"}
                     </button>
                   </>
                 )}

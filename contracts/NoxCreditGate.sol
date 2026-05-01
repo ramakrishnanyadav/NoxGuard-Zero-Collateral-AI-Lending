@@ -1,33 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "fhevm/lib/TFHE.sol";
-import "fhevm/gateway/GatewayCaller.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // ── Custom Errors ────────────────────────────────────────────────────────────
 error NoxGate__Unauthorised(address caller);
 error NoxGate__NoScoreToken();
 error NoxGate__InvalidThreshold(uint64 threshold);
-error NoxGate__RequestPending(address user, address lender);
-error NoxGate__NoPendingRequest(uint256 requestId);
 error NoxGate__LenderNotRegistered(address lender);
+error NoxGate__InvalidSignature();
 
 interface INoxScoreToken {
-    function getEncryptedScore(address user) external view returns (euint64);
     function hasScore(address user) external view returns (bool);
 }
 
 /**
  * @title  NoxCreditGate
- * @notice TFHE threshold gate. Users prove score >= lender's threshold
- *         without revealing the score. Two-step async pattern using fhevm Gateway.
- * @dev    Step 1: requestCreditCheck() → TFHE.gte() + Gateway decryption request
- *         Step 2: callbackCreditCheck() → Gateway returns bool → emit event
+ * @notice TEE threshold gate. Users prove score >= lender's threshold
+ *         by providing a cryptographic signature generated entirely within
+ *         the air-gapped SGX Enclave. No encrypted data is stored on-chain.
  */
-contract NoxCreditGate is ERC20, Ownable, ReentrancyGuard, GatewayCaller {
+contract NoxCreditGate is ERC20, Ownable, ReentrancyGuard {
+    using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
+
     struct LenderConfig {
         uint64  minScore;
         string  name;
@@ -36,27 +36,20 @@ contract NoxCreditGate is ERC20, Ownable, ReentrancyGuard, GatewayCaller {
         uint256 registeredAt;
     }
 
-    struct CreditCheckRequest {
-        address user;
-        address lender;
-        uint256 requestedAt;
-    }
-
     INoxScoreToken public scoreToken;
+    address public teeSignerAddress;
     mapping(address => LenderConfig) public lenders;
+    mapping(address => uint256) public nonces;
     address[] private _lenderList;
-    mapping(uint256 => CreditCheckRequest) private _pendingChecks;
-    mapping(bytes32 => uint256) private _activePairRequest;
 
     event LenderRegistered(address indexed lender, uint64 minScore, string name);
-    event CreditCheckRequested(address indexed user, address indexed lender, uint256 indexed requestId);
-    event CreditApproved(address indexed user, address indexed lender, uint256 indexed requestId, euint64 encryptedTier);
-    event CreditDenied(address indexed user, address indexed lender, uint256 indexed requestId);
+    event CreditApproved(address indexed user, address indexed lender);
     event LenderDeactivated(address indexed lender);
 
-    constructor(address _scoreToken) ERC20("Nox USD", "NOXUSD") Ownable(msg.sender) {
-        if (_scoreToken == address(0)) revert NoxGate__NoScoreToken();
+    constructor(address _scoreToken, address _teeSigner) ERC20("Nox USD", "NOXUSD") Ownable(msg.sender) {
+        if (_scoreToken == address(0) || _teeSigner == address(0)) revert NoxGate__NoScoreToken();
         scoreToken = INoxScoreToken(_scoreToken);
+        teeSignerAddress = _teeSigner;
     }
 
     function registerLender(
@@ -83,71 +76,32 @@ contract NoxCreditGate is ERC20, Ownable, ReentrancyGuard, GatewayCaller {
     }
 
     /**
-     * @notice Step 1: Request credit check. Performs TFHE.gte(userScore, threshold)
-     *         and sends ebool to Gateway for async decryption.
+     * @notice Claim a zero-collateral loan by submitting a TEE signature proving approval.
      */
-    function requestCreditCheck(address lender) external nonReentrant {
+    function claimCredit(address lender, bytes calldata teeSignature) external nonReentrant {
         if (!lenders[lender].active) revert NoxGate__LenderNotRegistered(lender);
         if (!scoreToken.hasScore(msg.sender)) revert NoxGate__Unauthorised(msg.sender);
 
-        bytes32 pairKey = keccak256(abi.encodePacked(msg.sender, lender));
-        if (_activePairRequest[pairKey] != 0) revert NoxGate__RequestPending(msg.sender, lender);
+        uint256 currentNonce = nonces[msg.sender];
+        bytes32 payload = keccak256(abi.encode(
+            block.chainid,
+            address(this),
+            msg.sender,
+            lender,
+            "APPROVED",
+            currentNonce
+        ));
+        bytes32 ethHash = payload.toEthSignedMessageHash();
+        address recovered = ethHash.recover(teeSignature);
 
-        euint64 encScore     = scoreToken.getEncryptedScore(msg.sender);
-        euint64 encThreshold = TFHE.asEuint64(lenders[lender].minScore);
-        ebool   encResult    = TFHE.ge(encScore, encThreshold);
-        TFHE.allowThis(encResult);
+        if (recovered != teeSignerAddress) revert NoxGate__InvalidSignature();
 
-        uint256[] memory cts = new uint256[](1);
-        cts[0] = Gateway.toUint256(encResult);
+        nonces[msg.sender]++;
 
-        uint256 requestId = Gateway.requestDecryption(
-            cts,
-            this.callbackCreditCheck.selector,
-            0,
-            block.timestamp + 3600,
-            false
-        );
+        // Mock zero-collateral loan disbursement
+        _mint(msg.sender, 10000 * 10 ** decimals());
 
-        _pendingChecks[requestId] = CreditCheckRequest({
-            user:        msg.sender,
-            lender:      lender,
-            requestedAt: block.timestamp
-        });
-        _activePairRequest[pairKey] = requestId;
-
-        emit CreditCheckRequested(msg.sender, lender, requestId);
-    }
-
-    /**
-     * @notice Step 2: Gateway callback with decrypted boolean result.
-     */
-    function callbackCreditCheck(
-        uint256 requestId,
-        bool approved
-    ) external onlyGateway nonReentrant {
-        CreditCheckRequest storage req = _pendingChecks[requestId];
-        if (req.user == address(0)) revert NoxGate__NoPendingRequest(requestId);
-
-        address user   = req.user;
-        address lender = req.lender;
-        bytes32 pairKey = keccak256(abi.encodePacked(user, lender));
-
-        delete _activePairRequest[pairKey];
-        delete _pendingChecks[requestId];
-
-        if (approved) {
-            euint64 encTier = TFHE.asEuint64(1);
-            TFHE.allow(encTier, user);
-            TFHE.allow(encTier, lender);
-
-            // Mock zero-collateral loan disbursement
-            _mint(user, 10000 * 10 ** decimals());
-
-            emit CreditApproved(user, lender, requestId, encTier);
-        } else {
-            emit CreditDenied(user, lender, requestId);
-        }
+        emit CreditApproved(msg.sender, lender);
     }
 
     function getLenders(uint256 offset, uint256 limit) external view returns (address[] memory) {

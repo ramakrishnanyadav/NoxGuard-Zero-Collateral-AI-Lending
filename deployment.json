@@ -1,12 +1,12 @@
 {
   "network": "arbitrumSepolia",
   "chainId": "421614",
-  "deployedAt": "2026-04-26T14:02:49.420Z",
+  "deployedAt": "2026-05-01T16:26:30.081Z",
   "deployer": "0x9c08eE09975D825A5aFCAcB8A908A4be7ab21F51",
   "contracts": {
-    "NoxScoreToken": "0x94b2A8A96bDF2e5a42F7aE0cF29982Dac8F07d58",
-    "NoxOracle": "0xADB8daFD9A8AfF06704F5Ea1dB2c4D14CfB3d31f",
-    "NoxCreditGate": "0xd27205f7C459e040e78207596E9F58dC89E7e40b"
+    "NoxScoreToken": "0x98d91b4A64D1be2F67dAA77Cd19b9c72c818f133",
+    "NoxOracle": "0x68b2D7F8Abc5eaD8cB0E4E7Cb299871076170CaE",
+    "NoxCreditGate": "0xAC2e7749A828F81ACcA33227dB965BcF3F7F9F6A"
   },
   "config": {
     "trustedMrenclave": "0x0000000000000000000000000000000000000000000000000000000000000000",

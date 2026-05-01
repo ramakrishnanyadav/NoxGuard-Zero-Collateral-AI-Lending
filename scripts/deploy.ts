@@ -7,13 +7,6 @@ dotenv.config();
 /**
  * NoxGuard Deployment Script
  * Deploys all contracts to Arbitrum Sepolia and writes addresses to .env
- *
- * Deployment order (dependencies first):
- *   1. NoxScoreToken  (no deps)
- *   2. NoxOracle      (needs tee signer address, mrenclave)
- *   3. NoxCreditGate  (needs scoreToken address)
- *   4. Wire contracts (setOracle, setCreditGate, setScoreToken)
- *   5. Verify contracts on Arbiscan
  */
 async function main(): Promise<void> {
   const [deployer] = await ethers.getSigners();
@@ -39,21 +32,19 @@ async function main(): Promise<void> {
   const trustedMrenclave = process.env.TRUSTED_MRENCLAVE ?? ethers.keccak256(
     ethers.toUtf8Bytes("noxguard-iapp-v1.0.0-placeholder")
   );
-  const teeSignerAddress = deployer.address; // Replace with actual TEE signer after Docker build
+  const teeSignerAddress = deployer.address; // Use deployer as placeholder for TEE signer
 
   console.log("Deploying NoxOracle...");
   const NoxOracle = await ethers.getContractFactory("NoxOracle");
   const noxOracle = await NoxOracle.deploy(trustedMrenclave, teeSignerAddress);
   await noxOracle.waitForDeployment();
   const oracleAddress = await noxOracle.getAddress();
-  console.log(`✓ NoxOracle deployed: ${oracleAddress}`);
-  console.log(`  MRENCLAVE: ${trustedMrenclave}`);
-  console.log(`  TEE signer: ${teeSignerAddress}\n`);
+  console.log(`✓ NoxOracle deployed: ${oracleAddress}\n`);
 
   // ── 3. Deploy NoxCreditGate ────────────────────────────────────────────────
   console.log("Deploying NoxCreditGate...");
   const NoxCreditGate = await ethers.getContractFactory("NoxCreditGate");
-  const noxCreditGate = await NoxCreditGate.deploy(scoreTokenAddress);
+  const noxCreditGate = await NoxCreditGate.deploy(scoreTokenAddress, teeSignerAddress);
   await noxCreditGate.waitForDeployment();
   const creditGateAddress = await noxCreditGate.getAddress();
   console.log(`✓ NoxCreditGate deployed: ${creditGateAddress}\n`);
@@ -64,10 +55,6 @@ async function main(): Promise<void> {
   const tx1 = await noxScoreToken.setOracle(oracleAddress);
   await tx1.wait(2);
   console.log(`✓ NoxScoreToken.setOracle(${oracleAddress})`);
-
-  const tx2 = await noxScoreToken.setCreditGate(creditGateAddress);
-  await tx2.wait(2);
-  console.log(`✓ NoxScoreToken.setCreditGate(${creditGateAddress})`);
 
   const tx3 = await noxOracle.setScoreToken(scoreTokenAddress);
   await tx3.wait(2);
@@ -105,27 +92,6 @@ async function main(): Promise<void> {
   console.log(`NEXT_PUBLIC_NOX_CREDIT_GATE_ADDRESS=${creditGateAddress}`);
   console.log(`NEXT_PUBLIC_NOX_ORACLE_ADDRESS=${oracleAddress}`);
   console.log("═══════════════════════════════════════════════\n");
-
-  // ── 7. Arbiscan verification (optional, requires API key) ─────────────────
-  if (process.env.ARBISCAN_API_KEY) {
-    console.log("Verifying contracts on Arbiscan (waiting 30s for indexing)...");
-    await new Promise(r => setTimeout(r, 30_000));
-
-    const { run } = await import("hardhat");
-
-    for (const [name, addr] of [
-      ["NoxScoreToken", scoreTokenAddress, []],
-      ["NoxOracle",     oracleAddress,    [trustedMrenclave, teeSignerAddress]],
-      ["NoxCreditGate", creditGateAddress, [scoreTokenAddress]],
-    ] as [string, string, unknown[]][]) {
-      try {
-        await run("verify:verify", { address: addr, constructorArguments: [] });
-        console.log(`✓ ${name} verified on Arbiscan`);
-      } catch (e) {
-        console.warn(`⚠ ${name} verification failed (may already be verified): ${String(e).slice(0, 60)}`);
-      }
-    }
-  }
 
   console.log("\n✅ NoxGuard deployment complete!");
 }
